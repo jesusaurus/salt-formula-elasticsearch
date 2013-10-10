@@ -1,0 +1,12 @@
+cluster.name: {{ salt['pillar.get']('elasticsearch:cluster_name', 'escluster') }}
+node.name: {{ grains['host'] }}
+
+{% set cluster_hosts = salt['pillar.get']('elasticsearch:cluster_hosts', False) %}
+{% if cluster_hosts -%}
+discovery.zen.ping.unicast.hosts: {{ cluster_hosts }}
+{% endif -%}
+
+{% set publish_host = salt['pillar.get']('elasticsearch:publish_host', None) %}
+{% if publish_host %}
+network.publish_host: {{ publish_host }}
+{% endif %}

@@ -1,4 +1,5 @@
 elasticsearch:
-  cluster_name: 'notthedefaultcluster'
-  publish_host: {{ salt['grains.get']('ip_interfaces:eth0')[0] }}
-  cluster_hosts: "192.168.1.2, 192.168.2.3"
+# use eth1, as under vagrant private network or public network, eth1 is the useful interface
+  publish_host: {{ salt['grains.get']('ip_interfaces:eth1')[0] }}
+  cluster_name: randomname
+  cluster_nodes: es01,es02

@@ -18,10 +18,10 @@ requirements:
       - openjdk-7-jre-headless
       - curl
 
+# we can't go outside for packages so this should be in an internal apt repo
+# https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-0.90.5.deb
 elasticsearch:
   pkg.installed:
-    - sources:
-      - elasticsearch: https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-0.90.5.deb
     - require:
       - pkg: requirements
   service:
@@ -30,11 +30,15 @@ elasticsearch:
       - file: /etc/elasticsearch/elasticsearch.yml
       - file: /etc/security/limits.conf
 
+{% set es_heap_size = salt['pillar.get']('elasticsearch:es_heap_size', salt['grains.get']('mem_total')/2) %}
+{% if es_heap_size > 2048 %}
+{% set es_heap_size = 2048 %}
+{% endif %}
 /etc/default/elasticsearch:
   file:
     - sed
     - before: '#ES_HEAP_SIZE=2g'
-    - after: ES_HEAP_SIZE={{ (grains['mem_total']/2)|round|int }}m
+    - after: ES_HEAP_SIZE={{ es_heap_size|round|int }}m
     - require:
       - pkg: elasticsearch
 
@@ -46,14 +50,14 @@ elasticsearch:
     - require:
       - pkg: elasticsearch
 
+# we have our own deb built form this
+# https://github.com/karmi/elasticsearch-paramedic
 #
 # Dashboard, available at http://elasticsearch:9200/_plugin/paramedic/index.html
 # displays basic information about your cluster: cluster name, health,
 # number of nodes and shards, etc., using the Cluster Health API.
-/usr/share/elasticsearch/bin/plugin -install karmi/elasticsearch-paramedic:
-  cmd:
-    - run
-    - unless: curl -s http://localhost:9200/_plugin/paramedic/index.html | grep Paramedic
+elasticsearch-paramedic:
+  pkg.installed:
     - require:
       - pkg: elasticsearch
 

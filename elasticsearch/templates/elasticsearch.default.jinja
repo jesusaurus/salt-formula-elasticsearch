@@ -1,0 +1,2 @@
+{% set es_heap_size = salt['pillar.get']('elasticsearch:es_heap_size', salt['grains.get']('mem_total')/2) %}
+ES_HEAP_SIZE={{ es_heap_size|round|int }}m

@@ -1,0 +1,8 @@
+{
+    "logstash_settings" : {
+        "template" : "logstash*",
+        "settings" : {
+            "index.cache.field.type" : "soft"
+        }
+    }
+}

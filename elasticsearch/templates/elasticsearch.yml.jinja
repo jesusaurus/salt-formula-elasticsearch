@@ -1,12 +1,72 @@
-cluster.name: {{ salt['pillar.get']('elasticsearch:cluster_name', 'escluster') }}
-node.name: {{ grains['host'] }}
+{% set confdir = salt['pillar.get']('elasticsearch:confdir', '/etc/elasticsearch') -%}
+{% set datadir = salt['pillar.get']('elasticsearch:datadir', '/var/lib/elasticsearch') -%}
+{% set logdir = salt['pillar.get']('elasticsearch:logdir', '/var/log/elasticsearch') -%}
+{% set cluster = salt['pillar.get']('elasticsearch:cluster_name', 'escluster') -%}
+{% set zone = salt['pillar.get']('elasticsearch:zone:' + grains['host'], False) -%}
+{% set nodes = salt['pillar.get']('elasticsearch:publish', {'defaultPublish': '127.0.0.1'}).values() -%}
+{% set nodecount = nodes |length -%}
+{% set shards = salt['pillar.get']('elasticsearch:shards', 5) -%}
+{% set replicas = salt['pillar.get']('elasticsearch:replicas', 1) -%}
+{% set _pernode = (replicas + 1) * shards / nodecount | round(method='ceil') + 1 -%}
+{% set pernode = salt['pillar.get']('elasticsearch:shards_per_node', _pernode) -%}
+{% set indexsize = salt['pillar.get']('elasticsearch:indexsize', '1g') -%}
+{% set rebalance = salt['pillar.get']('elasticsearch:rebalance', nodecount) -%}
+{% set recoveries = salt['pillar.get']('elasticsearch:recoveries', shards) -%}
+{% set interface = salt['pillar.get']('elasticsearch:interface', 'eth0') -%}
+{% set publish_host = salt['grains.get']('ip_interfaces:' + interface, grains['ipv4'])[0] -%}
+{% set minimum_masters = salt['pillar.get']('elasticsearch:minimum_masters', 1) %}
 
-{% set cluster_hosts = salt['pillar.get']('elasticsearch:cluster_hosts', False) %}
-{% if cluster_hosts -%}
-discovery.zen.ping.unicast.hosts: {{ cluster_hosts }}
-{% endif -%}
+path:
+  conf: {{ confdir }}
+  data: {{ datadir }}
+  logs: {{ logdir }}
 
-{% set publish_host = salt['pillar.get']('elasticsearch:publish_host', None) %}
-{% if publish_host %}
-network.publish_host: {{ publish_host }}
-{% endif %}
+cluster.name: {{ cluster }}
+node:
+  name: {{ grains['host'] }}
+  master: {% if master %}true{% else %}false{% endif %}
+  data: {% if data %}true{% else %}false{% endif %}
+{%- if zone %}
+  zone: {{ zone }}
+{%- endif %}
+
+index:
+  number_of_shards: {{ shards }}
+  number_of_replicas: {{ replicas }}
+  query.default_field: "@message"
+  refresh_interval: 5s
+  store:
+    compress:
+      stored: true
+      tv: true
+  routing.allocation.total_shards_per_node: {{ pernode }}
+  cache.field.type: "soft"
+
+indices:
+  memory.index_buffer_size: {{ indexsize }}
+  recovery.file_chunk_size: 8mb
+
+gateway:
+  recover_after_nodes: {{ nodecount }}
+  recover_after_time: 10m
+  expected_nodes: {{ nodecount }}
+
+cluster.routing.allocation:
+{%- if zone %}
+  awareness:
+    attributes: zone
+{%- endif %}
+  cluster_concurrent_rebalance: {{ rebalance }}
+  allow_rebalance: indices_all_active
+  node_concurrent_recoveries: {{ recoveries }}
+
+network:
+  publish_host: {{ publish_host }}
+  tcp.keep_alive: true
+
+discovery.zen:
+  minimum_master_nodes: {{ minimum_masters }}
+  ping_timeout: 3s
+  ping:
+    multicast.enabled: false
+    unicast.hosts: [ {{ ', '.join(nodes) }} ]

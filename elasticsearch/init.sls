@@ -12,7 +12,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 #
-requirements:
+{% set confdir = salt['pillar.get']('elasticsearch:confdir', '/etc/elasticsearch') -%}
+{% set datadir = salt['pillar.get']('elasticsearch:datadir', '/var/lib/elasticsearch') -%}
+{% set logdir = salt['pillar.get']('elasticsearch:logdir', '/var/log/elasticsearch') -%}
+
+elasticsearch_requirements:
   pkg.installed:
     - pkgs:
       - openjdk-7-jre-headless
@@ -23,32 +27,65 @@ requirements:
 elasticsearch:
   pkg.installed:
     - require:
-      - pkg: requirements
+      - pkg: elasticsearch_requirements
   service:
     - running
+    - require:
+      - file: /etc/init.d/elasticsearch
+      - file: {{ datadir }}
+      - file: {{ logdir }}
+      - file: /etc/default/elasticsearch
     - watch:
       - file: /etc/elasticsearch/elasticsearch.yml
-      - file: /etc/security/limits.conf
+      - file: /etc/elasticsearch/default-mapping.json
+      - file: /etc/elasticsearch/templates/logstash.json
 
-{% set es_heap_size = salt['pillar.get']('elasticsearch:es_heap_size', salt['grains.get']('mem_total')/2) %}
-{% if es_heap_size > 2048 %}
-{% set es_heap_size = 2048 %}
-{% endif %}
-/etc/default/elasticsearch:
-  file:
-    - sed
-    - before: '#ES_HEAP_SIZE=2g'
-    - after: ES_HEAP_SIZE={{ es_heap_size|round|int }}m
+/etc/init.d/elasticsearch:
+  file.managed:
+    - source: salt://elasticsearch/templates/elasticsearch.initd.jinja
+    - template: jinja
+    - mode: 755
     - require:
       - pkg: elasticsearch
 
-/etc/elasticsearch/elasticsearch.yml:
+{{ datadir }}:
+  file.directory:
+    - user: elasticsearch
+    - group: elasticsearch
+    - require:
+      - pkg: elasticsearch
+
+{{ logdir }}:
+  file.directory:
+    - user: elasticsearch
+    - group: elasticsearch
+    - require:
+      - pkg: elasticsearch
+
+/etc/default/elasticsearch:
   file:
     - managed
-    - source: salt://elasticsearch/templates/elasticsearch.yml.jinja
+    - source: salt://elasticsearch/templates/elasticsearch.default.jinja
     - template: jinja
     - require:
       - pkg: elasticsearch
+
+{{ confdir }}/default-mapping.json:
+  file:
+    - managed
+    - source: salt://elasticsearch/templates/default-mapping.json
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 0644
+    - require:
+      - pkg: elasticsearch
+
+{{ confdir }}/templates/logstash.json:
+  file:
+    - managed
+    - makedirs: true
+    - source: salt://elasticsearch/templates/logstash-template.json
 
 # we have our own deb built form this
 # https://github.com/karmi/elasticsearch-paramedic
@@ -60,16 +97,3 @@ elasticsearch-paramedic:
   pkg.installed:
     - require:
       - pkg: elasticsearch
-
-/etc/pam.d/su:
-  file:
-    - sed
-    - before: '# session    required   pam_limits.so'
-    - after: 'session    required   pam_limits.so'
-
-/etc/security/limits.conf:
-  file:
-    - append
-    - text:
-      - elasticsearch soft nofile 60000
-      - elasticsearch hard nofile 60000

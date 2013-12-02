@@ -37,8 +37,8 @@ elasticsearch:
       - file: /etc/default/elasticsearch
     - watch:
       - file: /etc/elasticsearch/elasticsearch.yml
-      - file: /etc/elasticsearch/default-mapping.json
-      - file: /etc/elasticsearch/templates/logstash.json
+      - file: {{ confdir }}/default-mapping.json
+      - file: {{ confdir }}/templates/logstash.json
 
 /etc/init.d/elasticsearch:
   file.managed:

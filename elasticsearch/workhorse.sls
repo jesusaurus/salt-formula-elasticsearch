@@ -28,5 +28,5 @@ include:
       data: true }
     - require:
       - pkg: elasticsearch
-
-
+    - watch_in:
+      - service: elasticsearch

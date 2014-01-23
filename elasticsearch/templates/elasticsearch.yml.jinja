@@ -14,6 +14,8 @@
 {% set recoveries = salt['pillar.get']('elasticsearch:recoveries', shards) -%}
 {% set interface = salt['pillar.get']('elasticsearch:interface', 'eth0') -%}
 {% set publish_host = salt['grains.get']('ip_interfaces:' + interface, grains['ipv4'])[0] -%}
+{% set transport_port = salt['pillar.get']('elasticsearch:transport_port', 9300) -%}
+{% set http_port = salt['pillar.get']('elasticsearch:http_port', 9200) -%}
 {% set minimum_masters = salt['pillar.get']('elasticsearch:minimum_masters', 1) %}
 
 path:
@@ -63,6 +65,9 @@ cluster.routing.allocation:
 network:
   publish_host: {{ publish_host }}
   tcp.keep_alive: true
+
+transport.tcp.port: {{ transport_port }}
+http.port: {{ http_port }}
 
 discovery.zen:
   minimum_master_nodes: {{ minimum_masters }}
